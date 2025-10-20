@@ -53,12 +53,14 @@ Senast inloggad: $($user.lastLogon)
 $deptGroups = $data.users | Group-Object -Property department
 
 # Visa resultat
-Write-Host "ANVÄNDARE PER AVDELNING (Group-Object):"
+Write-Host `n"ANVÄNDARE PER AVDELNING:"
 Write-Host $("-" * 40)
 foreach ($group in $deptGroups) {
     Write-Host "$($group.Name): $($group.Count) användare"
 }
 
+Write-Host `n"ANVÄNDARE PER SITE:"
+Write-Host $("-" * 40)
 $data.computers | 
 Group-Object -Property site | 
 Sort-Object -Property Count -Descending |
@@ -66,4 +68,4 @@ ForEach-Object {
     Write-Host "$($_.Name): $($_.Count) datorer"
 }
 
-#Write-Host $report
+Write-Host $report
