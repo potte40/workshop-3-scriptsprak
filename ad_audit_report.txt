@@ -1,21 +1,23 @@
 ================================================================================
                     ACTIVE DIRECTORY AUDIT REPORT
 ================================================================================
-Generated: 2025-10-25 20:44:58
+Generated: 2025-10-26 12:42:50
 Domain: techcorp.local
 Export Date: 10/14/2025 06:00:00
 
 EXECUTIVE SUMMARY
 -----------------
+⚠ CRITICAL: 3 user accounts expiring within 30 days
 ⚠ WARNING: 7 users haven't logged in for 30+ days
-⚠ WARNING: 5 computers not seen in 30+ days
+⚠ WARNING: 4 computers not seen in 30+ days
+⚠ SECURITY: 29 users with passwords older than 90 days
 ✓ POSITIVE: 55% of computers running Windows 11
 
 USER ACCOUNT STATUS
 -------------------
 Total Users: 31
-Active Users: 31 (100%)
-Disabled Accounts: 0
+Active Users: 29 (94%)
+Disabled Accounts: 2
 
 
 INACTIVE USERS (No login >30 days)
@@ -42,13 +44,14 @@ COMPUTER STATUS
 ---------------
 Total Computers: 20
 Active (seen <7 days): 15
-Inactive (>30 days): 5
+Inactive (>30 days): 4
+
 COMPUTERS BY OPERATING SYSTEM
 ------------------------------
-Windows 10 Enterprise       1 (5%) ⚠ Needs upgrade
-Windows 10 Pro              4 (20%) ⚠ Needs upgrade
-Windows 11 Enterprise       1 (5%)
-Windows 11 Pro             10 (50%)
-Windows Server 2019         1 (5%)
-Windows Server 2022         3 (15%)
+Windows 11 Pro                       10 (50%)
+Windows 10 Pro                        4 (20%) ⚠ Needs upgrade
+Windows Server 2022                   3 (15%)
+Windows 10 Enterprise                 1 (5%) ⚠ Needs upgrade
+Windows 11 Enterprise                 1 (5%)
+Windows Server 2019                   1 (5%)
 

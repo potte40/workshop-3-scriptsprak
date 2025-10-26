@@ -1,7 +1,10 @@
 ﻿# Läs in JSON
 $data = Get-Content -Path "ad_export.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 
-# Anropa funktionen inactiveUsers
+### Anropa functionsfilen ###
+. "$PSScriptRoot\functions.ps1"
+
+### Anropa funktionen inactiveUsers ###
 $inactiveUsers = Get-InactiveAccounts -Data $data -Days 30
 
 ########### Jag använder mig utav funktionen istället, skulle kunna plocka bort det här men låter det vara. ###########
@@ -53,11 +56,11 @@ Select-Object samAccountName, displayName, passwordLastSet, email,
 } |
 Sort-Object -Property PasswordAgeDays -Descending
 
-# Exportera till CSV
-#$passwordAges | Export-Csv -Path "$PSScriptRoot\password_age.csv" -NoTypeInformation -Encoding UTF8
-#Write-Host "`nCSV-fil skapad: password_age.csv"
+### Exportera till CSV ### 
+$passwordAges | Export-Csv -Path "$PSScriptRoot\password_age.csv" -NoTypeInformation -Encoding UTF8
+Write-Host "`nCSV-fil skapad: password_age.csv"
 
-# Skriv ut topplistan i terminalen
+### Skriv ut topplistan i terminalen ###
 Write-Host "`nANVÄNDARE MED ÄLDST LÖSENORD:"
 Write-Host $("-" * 45)
 foreach ($user in $passwordAges | Select-Object -First 10) {
@@ -66,7 +69,7 @@ foreach ($user in $passwordAges | Select-Object -First 10) {
 }
 
 
-# Skapa copmuter_status.csv
+### Skapa copmuter_status.csv ###
 $computerStatus = $data.computers |
 Group-Object -Property site |
 ForEach-Object {
@@ -89,22 +92,21 @@ ForEach-Object {
     }
 }
 
-# Exportera till CSV
+### Exportera till CSV ###
 $computerStatus | Export-Csv -Path "$PSScriptRoot\computer_status.csv" -NoTypeInformation -Encoding UTF8
 
 Write-Host "`nCSV-fil skapad: computer_status.csv"
 
-# Visa i terminalen
+### Visa i terminalen ###
 Write-Host "`nDatorstatistik per site:"
 $computerStatus | Format-Table -AutoSize
 
 
 # ===========================
-# Rapporten
+#         Rapporten         #
 # ===========================
-# Skapade en ny variabel så att jag får statistiken från Json istället för dagens datum.
 
-# Dynamisk räknare för datorer
+### Dynamisk räknare för datorer ###
 $activeComputersCount = ($data.computers | Where-Object { (New-TimeSpan -Start (SafeParseDate $_.lastLogon) -End $today).Days -le 7 }).Count
 $inactiveComputersCount = ($data.computers | Where-Object { (New-TimeSpan -Start (SafeParseDate $_.lastLogon) -End $today).Days -ge 30 }).Count
 
@@ -121,7 +123,7 @@ EXECUTIVE SUMMARY
 
 "@
 
-# Dynamiska varningar
+### Dynamiska varningar ###
 if ($expiringAccounts -and $expiringAccounts.Count -gt 0) {
     $report += "⚠ CRITICAL: $($expiringAccounts.Count) user accounts expiring within 30 days`n"
 }
@@ -131,21 +133,20 @@ if ($inactiveUsers.Count -gt 0) {
 if ($inactiveComputersCount -gt 0) {
     $report += "⚠ WARNING: $inactiveComputersCount computers not seen in 30+ days`n"
 }
-if ($oldPasswords.Count -gt 0) {
-    $report += "⚠ SECURITY: $($oldPasswords.Count) users with passwords older than 90 days`n"
+if ($passwordAges.Count -gt 0) {
+    $report += "⚠ SECURITY: $($passwordAges.Count) users with passwords older than 90 days`n"
 }
 
-# POSITIV statistik
+### POSITIV statistik ###
 $win11Count = ($data.computers | Where-Object { $_.operatingSystem -match "Windows 11" }).Count
 $win11Percent = if ($totalComputers -gt 0) { [math]::Round(($win11Count / $totalComputers) * 100) } else { 0 }
 $report += "✓ POSITIVE: $win11Percent`% of computers running Windows 11`n`n"
 
-# ===========================
-# USER ACCOUNT STATUS
-# ===========================
+### USER ACCOUNT STATUS ###
+
 $totalUsers = $data.users.Count
-$activeUsers = ($data.users | Where-Object { -not $_.disabled }).Count
-$disabledUsers = ($data.users | Where-Object { $_.disabled }).Count
+$activeUsers = ($data.users | Where-Object { $_.enabled }).Count
+$disabledUsers = ($data.users | Where-Object { -not $_.enabled }).Count
 
 $report += @"
 USER ACCOUNT STATUS
@@ -165,40 +166,50 @@ foreach ($user in $inactiveUsers | Sort-Object -Property lastLogon) {
     $report += "{0,-15} {1,-21} {2,-12} {3,-32} {4,3}`n" -f $user.samAccountName, $user.displayName, $user.department, $user.lastLogon, $daysInactive
 }
 
-# ===========================
-# USERS PER DEPARTMENT
-# ===========================
+### USERS PER DEPARTMENT ###
 $report += "`nUSERS PER DEPARTMENT
 --------------------`n"
 foreach ($group in $deptGroups | Sort-Object -Property Count -Descending) {
     $report += "{0,-20} {1} users`n" -f $group.Name, $group.Count
 }
 
-# ===========================
-# COMPUTER STATUS
-# ===========================
+
+### COMPUTER STATUS ###
+
 $report += "`nCOMPUTER STATUS
 ---------------`n"
 $report += @"
 Total Computers: $totalComputers
 Active (seen <7 days): $activeComputersCount
 Inactive (>30 days): $inactiveComputersCount
+
 "@
 
-# ===========================
-# COMPUTERS BY OPERATING SYSTEM
-# ===========================
+### COMPUTERS BY OPERATING SYSTEM ###
+
+# Gruppindelning och sortering
+$osGroups = @($data.computers) | Group-Object -Property operatingSystem | Sort-Object -Property Count -Descending
+
 $report += "`nCOMPUTERS BY OPERATING SYSTEM
 ------------------------------`n"
-$osGroups = $data.computers | Group-Object -Property operatingSystem
+
 foreach ($os in $osGroups) {
-    $percent = [math]::Round(($os.Count / $totalComputers) * 100)
-    $needsUpgrade = if ($os.Name -match "Windows 10") { " ⚠ Needs upgrade" } else { "" }
-    $report += "{0,-25} {1,3} ({2}%)$needsUpgrade`n" -f $os.Name, $os.Count, $percent
+    # Skydda mot division-by-zero
+    $percent = if ($totalComputers -gt 0) {
+        [math]::Round(($os.Count / $totalComputers) * 100)
+    }
+    else {
+        0
+    }
+
+    $osName = if ($os.Name) { $os.Name } else { "<Unknown OS>" }
+    $needsUpgrade = if ($osName -match "Windows 10") { " ⚠ Needs upgrade" } else { "" }
+
+    $report += "{0,-35} {1,3} ({2}%)$needsUpgrade`n" -f ($osName.Trim()), $os.Count, $percent
 }
 
 # ===========================
-# SPARA TILL FIL
+#      SPARA TILL FIL       #
 # ===========================
 $reportPath = Join-Path -Path $PSScriptRoot -ChildPath "ad_audit_report.txt"
 $report | Out-File -FilePath $reportPath -Encoding UTF8
