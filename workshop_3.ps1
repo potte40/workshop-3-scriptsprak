@@ -107,6 +107,7 @@ $computerStatus | Format-Table -AutoSize
 # ===========================
 
 ### Dynamisk räknare för datorer ###
+$totalComputers = $data.computers.Count
 $activeComputersCount = ($data.computers | Where-Object { (New-TimeSpan -Start (SafeParseDate $_.lastLogon) -End $today).Days -le 7 }).Count
 $inactiveComputersCount = ($data.computers | Where-Object { (New-TimeSpan -Start (SafeParseDate $_.lastLogon) -End $today).Days -ge 30 }).Count
 

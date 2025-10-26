@@ -1,28 +1,4 @@
-
-#Läs in JSON
-$data = Get-Content -Path "ad_export.json" -Raw -Encoding UTF8 | ConvertFrom-Json
-
-### Function för inaktiva accounts ###
-function Get-InactiveAccounts {
-    param (
-        [Parameter(Mandatory = $true)]
-        $Data,
-
-        [int]$Days = 30
-    )
-
-    $cutoffDate = $today.AddDays(-$Days)
-
-    $inactiveUsers = $Data.users |
-    Where-Object { [datetime]$_.lastLogon -lt $cutoffDate } |
-    Select-Object samAccountName, displayName, email, department, site, lastLogon, accountExpires,
-    @{Name = 'DaysInactive'; Expression = { (New-TimeSpan -Start ([datetime]$_.lastLogon) -End $today).Days } } |
-    Sort-Object -Property DaysInactive -Descending
-
-    return $inactiveUsers
-}
-
-### Function för Safedate ###
+### Function för SafeParseDate ###
 function SafeParseDate {
     param([string]$DateString)
     try {
@@ -34,21 +10,47 @@ function SafeParseDate {
     }
 }
 
+### Function för inaktiva konton ###
+function Get-InactiveAccounts {
+    param (
+        [Parameter(Mandatory = $true)]
+        $Data,
 
-### Function för att hitta expiring accounts ###
-$reportDate = if ($data.export_date) { [datetime]$data.export_date } else { Get-Date }
+        [int]$Days = 30,
 
-$expiringAccounts = $data.users | Where-Object {
+        [datetime]$Today
+    )
 
-    if (-not $_.accountExpires -or $_.accountExpires -eq '') { return $false }
+    if (-not $Today) { $Today = Get-Date }
 
-    try {
-        $exp = [datetime]$_.accountExpires
+    $cutoffDate = $Today.AddDays(-$Days)
+
+    $inactiveUsers = $Data.users |
+    Where-Object { ([datetime]$_.lastLogon) -lt $cutoffDate } |
+    Select-Object samAccountName, displayName, email, department, site, lastLogon, accountExpires,
+    @{Name = 'DaysInactive'; Expression = { (New-TimeSpan -Start ([datetime]$_.lastLogon) -End $Using:Today).Days } } |
+    Sort-Object -Property DaysInactive -Descending
+
+    return $inactiveUsers
+}
+
+### Function för expiring accounts ###
+function Get-ExpiringAccounts {
+    param (
+        [Parameter(Mandatory = $true)]
+        $Data,
+
+        [datetime]$ReportDate
+    )
+
+    if (-not $ReportDate) { $ReportDate = Get-Date }
+
+    $expiringAccounts = $Data.users | Where-Object {
+        if (-not $_.accountExpires -or $_.accountExpires -eq '') { return $false }
+        try { $exp = [datetime]$_.accountExpires } catch { return $false }
+        $daysUntil = (New-TimeSpan -Start $ReportDate -End $exp).Days
+        return ($daysUntil -ge 0 -and $daysUntil -le 30)
     }
-    catch {
-        return $false
-    }
 
-    $daysUntil = (New-TimeSpan -Start $reportDate -End $exp).Days
-    return ($daysUntil -ge 0 -and $daysUntil -le 30)
+    return $expiringAccounts
 }
