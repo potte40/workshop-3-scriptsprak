@@ -1,15 +1,16 @@
 ================================================================================
                     ACTIVE DIRECTORY AUDIT REPORT
 ================================================================================
-Generated: 2025-10-26 13:06:59
+Generated: 2025-10-26 14:02:15
 Domain: techcorp.local
 Export Date: 10/14/2025 06:00:00
 
 EXECUTIVE SUMMARY
 -----------------
+⚠ CRITICAL: 3 user accounts expiring within 30 days
 ⚠ WARNING: 7 users haven't logged in for 30+ days
 ⚠ WARNING: 4 computers not seen in 30+ days
-⚠ SECURITY: 29 users with passwords older than 90 days
+⚠ SECURITY: 11 users with passwords older than 90 days
 ✓ POSITIVE: 55% of computers running Windows 11
 
 USER ACCOUNT STATUS

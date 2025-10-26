@@ -26,9 +26,16 @@ function Get-InactiveAccounts {
     $cutoffDate = $Today.AddDays(-$Days)
 
     $inactiveUsers = $Data.users |
-    Where-Object { ([datetime]$_.lastLogon) -lt $cutoffDate } |
+    Where-Object { 
+        $lastLogon = [datetime]$_.lastLogon
+        $lastLogon -lt $cutoffDate
+    } |
     Select-Object samAccountName, displayName, email, department, site, lastLogon, accountExpires,
-    @{Name = 'DaysInactive'; Expression = { (New-TimeSpan -Start ([datetime]$_.lastLogon) -End $Using:Today).Days } } |
+    @{Name = 'DaysInactive'; Expression = { 
+            $last = [datetime]$_.lastLogon
+            (New-TimeSpan -Start $last -End $Today).Days
+        }
+    } |
     Sort-Object -Property DaysInactive -Descending
 
     return $inactiveUsers
@@ -40,15 +47,15 @@ function Get-ExpiringAccounts {
         [Parameter(Mandatory = $true)]
         $Data,
 
-        [datetime]$ReportDate
+        [datetime]$today
     )
 
-    if (-not $ReportDate) { $ReportDate = Get-Date }
+    if (-not $today) { $today = Get-Date }
 
     $expiringAccounts = $Data.users | Where-Object {
         if (-not $_.accountExpires -or $_.accountExpires -eq '') { return $false }
         try { $exp = [datetime]$_.accountExpires } catch { return $false }
-        $daysUntil = (New-TimeSpan -Start $ReportDate -End $exp).Days
+        $daysUntil = (New-TimeSpan -Start $today -End $exp).Days
         return ($daysUntil -ge 0 -and $daysUntil -le 30)
     }
 

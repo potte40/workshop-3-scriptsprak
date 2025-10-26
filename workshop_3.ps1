@@ -4,8 +4,13 @@ $data = Get-Content -Path "ad_export.json" -Raw -Encoding UTF8 | ConvertFrom-Jso
 ### Anropa functionsfilen ###
 . "$PSScriptRoot\functions.ps1"
 
-### Anropa funktionen inactiveUsers ###
-$inactiveUsers = Get-InactiveAccounts -Data $data -Days 30
+### Anropa funktioner ###
+$today = SafeParseDate $data.export_date
+$inactiveUsers = Get-InactiveAccounts -Data $data -Days 30 -Today $today
+$expiringAccounts = Get-ExpiringAccounts -Data $data -Today $today
+
+
+
 
 ########### Jag använder mig utav funktionen istället, skulle kunna plocka bort det här men låter det vara. ###########
 # Exempel: Användare som inte loggat in på 30 dagar
@@ -44,8 +49,6 @@ ForEach-Object {
 
 
 ### Beräkna lösenordsålder ###
-
-$today = SafeParseDate $data.export_date
 
 $passwordAges = $data.users |
 Where-Object { -not $_.passwordNeverExpires } |
@@ -111,6 +114,9 @@ $totalComputers = $data.computers.Count
 $activeComputersCount = ($data.computers | Where-Object { (New-TimeSpan -Start (SafeParseDate $_.lastLogon) -End $today).Days -le 7 }).Count
 $inactiveComputersCount = ($data.computers | Where-Object { (New-TimeSpan -Start (SafeParseDate $_.lastLogon) -End $today).Days -ge 30 }).Count
 
+### Räkna ut lösenord äldre än 90 dagar
+$oldPasswords = $passwordAges | Where-Object { $_.PasswordAgeDays -gt 90 }
+
 $report = @"
 ================================================================================
                     ACTIVE DIRECTORY AUDIT REPORT
@@ -125,17 +131,18 @@ EXECUTIVE SUMMARY
 "@
 
 ### Dynamiska varningar ###
-if ($expiringAccounts -and $expiringAccounts.Count -gt 0) {
-    $report += "⚠ CRITICAL: $($expiringAccounts.Count) user accounts expiring within 30 days`n"
+if (@($expiringAccounts).Count -gt 0) {
+    $report += "⚠ CRITICAL: $(@($expiringAccounts).Count) user accounts expiring within 30 days`n"
 }
+
 if ($inactiveUsers.Count -gt 0) {
     $report += "⚠ WARNING: $($inactiveUsers.Count) users haven't logged in for 30+ days`n"
 }
 if ($inactiveComputersCount -gt 0) {
     $report += "⚠ WARNING: $inactiveComputersCount computers not seen in 30+ days`n"
 }
-if ($passwordAges.Count -gt 0) {
-    $report += "⚠ SECURITY: $($passwordAges.Count) users with passwords older than 90 days`n"
+if ($oldPasswords.Count -gt 0) {
+    $report += "⚠ SECURITY: $($oldPasswords.Count) users with passwords older than 90 days`n"
 }
 
 ### POSITIV statistik ###
@@ -214,6 +221,6 @@ foreach ($os in $osGroups) {
 # ===========================
 $reportPath = Join-Path -Path $PSScriptRoot -ChildPath "ad_audit_report.txt"
 $report | Out-File -FilePath $reportPath -Encoding UTF8
-Write-Host "`nAudit report skapad: $reportPath"
+Write-Host "`nRapport skapad: $reportPath"
 
 
